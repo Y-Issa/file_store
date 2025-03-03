@@ -1,7 +1,7 @@
 import Card from "@/components/Card";
 import Sort from "@/components/Sort";
-import { getFiles } from "@/lib/actions/file.actions";
-import { getFileTypesParams } from "@/lib/utils";
+import { getFiles, getTotalSpaceUsed } from "@/lib/actions/file.actions";
+import { convertFileSize, getFileTypesParams } from "@/lib/utils";
 import { Models } from "node-appwrite";
 import React from "react";
 
@@ -12,7 +12,19 @@ const page = async ({ searchParams, params }: SearchParamProps) => {
 
   const types = getFileTypesParams(type) as FileType[];
 
-  const files = await getFiles({ types, searchText, sort });
+  // Fetch files and total space concurrently
+  const [files, totalSpace] = await Promise.all([
+    getFiles({ types, searchText, sort }),
+    getTotalSpaceUsed(),
+  ]);
+
+  console.log("Type:", type);
+  console.log("Total Space Data:", totalSpace);
+
+  // Ensure type is formatted properly when checking totalSpace[type]
+  const formattedType = type.endsWith("s") ? type.slice(0, -1) : type;
+  const usedSpace = totalSpace[formattedType]?.size || 0;
+  const formattedUsedSpace = convertFileSize(usedSpace);
 
   return (
     <div className="page-container">
@@ -21,12 +33,14 @@ const page = async ({ searchParams, params }: SearchParamProps) => {
 
         <div className="total-size-section">
           <p className="body-1">
-            Total: <span className="h5">0 MB</span>
+            Total Files: <span className="h5">{files?.total || 0}</span>
+          </p>
+          <p className="body-1">
+            Total Size: <span className="h5">{formattedUsedSpace}</span>
           </p>
 
           <div className="sort-container">
             <p className="body-1 hidden sm:block text-light-200">Sort by:</p>
-
             <Sort />
           </div>
         </div>
@@ -40,7 +54,7 @@ const page = async ({ searchParams, params }: SearchParamProps) => {
           ))}
         </section>
       ) : (
-        <p className="empty-list">No files Uploaded..</p>
+        <p className="empty-list">No files uploaded.</p>
       )}
     </div>
   );
